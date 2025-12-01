@@ -1,0 +1,7 @@
+{
+  "name": "EcoSense India: All-Source Weather",
+  "description": "A comprehensive weather and air-quality dashboard consolidating data from IMD, KSNDMC, WeatherUnion, and OpenAQ with comparative analytics and geospatial visualization.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
