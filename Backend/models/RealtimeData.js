@@ -59,10 +59,11 @@ const realtimeDataSchema = new mongoose.Schema({
     default: 85
   },
   
+  
   alerts: [{
-    type: String,
-    level: String,  // 'warning', 'critical'
-    message: String
+    type: { type: String },
+    level: { type: String },
+    message: { type: String }
   }],
   
   lastUpdated: Date

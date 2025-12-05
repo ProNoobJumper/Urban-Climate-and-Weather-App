@@ -25,13 +25,13 @@ class MasterCollector {
       imd: new IMDCollector(),
       weatherUnion: new WeatherUnionCollector(),
       ksndmc: new KSNDMCCollector(),
-      openAQ: new OpenAQCollector(),
+      // openAQ: new OpenAQCollector(), // DISABLED - API deprecated (HTTP 410)
       googleAQI: new GoogleAQICollector(),
       urbanEmission: new UrbanEmissionCollector(),
       openCity: new OpenCityCollector()
     };
 
-    logger.info('MasterCollector initialized with 8 data sources');
+    logger.info('MasterCollector initialized with 7 data sources (OpenAQ disabled - API deprecated)');
   }
 
   /**
@@ -90,7 +90,7 @@ class MasterCollector {
       this._collectFromSource('imd', lat, lng, name),
       this._collectFromSource('weatherUnion', lat, lng, name),
       this._collectFromSource('ksndmc', lat, lng, name),
-      this._collectFromSource('openAQ', lat, lng, name),
+      // this._collectFromSource('openAQ', lat, lng, name), // DISABLED - API deprecated
       this._collectFromSource('googleAQI', lat, lng, name),
       this._collectFromSource('urbanEmission', lat, lng, name),
       this._collectFromSource('openCity', lat, lng, name)

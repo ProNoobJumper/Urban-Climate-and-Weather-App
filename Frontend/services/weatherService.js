@@ -623,7 +623,7 @@ const fetchFromOpenMeteo = async (cityName) => {
       no2: aqi.current.nitrogen_dioxide,
       status: getAQIStatus(aqi.current.us_aqi)
     }],
-    alerts: generateFallbackAlerts(weather.current, aqi.current)
+    alerts: generateFallbackAlerts(weather.current, aqi.current, name)
   };
 };
 
@@ -719,20 +719,21 @@ const getAQIStatus = (aqi) => {
   return 'Hazardous';
 };
 
-const generateFallbackAlerts = (weather, aqi) => {
+const generateFallbackAlerts = (weather, aqi, cityName = '') => {
   const alerts = [];
+  const cityPrefix = cityName ? ` in ${cityName}` : '';
   
   // Temp
-  if (weather.temperature_2m > 40) alerts.push({ type: 'Heatwave Warning', level: 'critical', message: `Extreme heat: ${weather.temperature_2m}°C` });
-  else if (weather.temperature_2m > 35) alerts.push({ type: 'High Temperature', level: 'warning', message: `High temp: ${weather.temperature_2m}°C` });
-  else if (weather.temperature_2m < 5) alerts.push({ type: 'Cold Wave Warning', level: 'critical', message: `Extreme cold: ${weather.temperature_2m}°C` });
+  if (weather.temperature_2m > 40) alerts.push({ type: 'Heatwave Warning', level: 'critical', message: `Extreme heat${cityPrefix}: ${weather.temperature_2m}°C` });
+  else if (weather.temperature_2m > 35) alerts.push({ type: 'High Temperature', level: 'warning', message: `High temp${cityPrefix}: ${weather.temperature_2m}°C` });
+  else if (weather.temperature_2m < 5) alerts.push({ type: 'Cold Wave Warning', level: 'critical', message: `Extreme cold${cityPrefix}: ${weather.temperature_2m}°C` });
 
   // AQI
-  if (aqi.us_aqi > 300) alerts.push({ type: 'Hazardous Air Quality', level: 'critical', message: `Hazardous AQI: ${aqi.us_aqi}` });
-  else if (aqi.us_aqi > 200) alerts.push({ type: 'Very Unhealthy Air', level: 'warning', message: `Very Unhealthy AQI: ${aqi.us_aqi}` });
+  if (aqi.us_aqi > 300) alerts.push({ type: 'Hazardous Air Quality', level: 'critical', message: `Hazardous AQI${cityPrefix}: ${aqi.us_aqi}` });
+  else if (aqi.us_aqi > 200) alerts.push({ type: 'Very Unhealthy Air', level: 'warning', message: `Very Unhealthy AQI${cityPrefix}: ${aqi.us_aqi}` });
 
   // Wind
-  if (weather.wind_speed_10m > 50) alerts.push({ type: 'High Wind Warning', level: 'warning', message: `High winds: ${weather.wind_speed_10m} km/h` });
+  if (weather.wind_speed_10m > 50) alerts.push({ type: 'High Wind Warning', level: 'warning', message: `High winds${cityPrefix}: ${weather.wind_speed_10m} km/h` });
 
   return alerts;
 };

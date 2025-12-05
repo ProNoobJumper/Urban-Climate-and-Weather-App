@@ -1,6 +1,6 @@
 # 🎯 Urban Climate & Weather App - Feature Tracker
 
-**Last Updated:** December 5, 2025  
+**Last Updated:** December 5, 2025 (Evening - Backend Fixes)
 **Project Status:** In Active Development
 
 ---
@@ -24,22 +24,10 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 ## 🔧 BACKEND FEATURES
 
-### Data Collection & Aggregation
-
-| Feature                                        | Status | Notes                                    |
-| ---------------------------------------------- | ------ | ---------------------------------------- |
-| OpenMeteo API Integration                      | ✅     | Historical and real-time data collection |
-| IMD (India Meteorological Dept) Integration    | ✅     | Government weather data source           |
-| WeatherUnion API Integration                   | ✅     | Commercial weather data                  |
-| KSNDMC API Integration                         | ✅     | Karnataka State data                     |
-| OpenAQ API Integration                         | ✅     | Air quality data                         |
-| Google AQI API Integration                     | ✅     | Air quality index                        |
-| UrbanEmission API Integration                  | ✅     | Urban pollution data                     |
-| OpenCity API Integration                       | ✅     | City-specific environmental data         |
-| NASA FIRMS Integration                         | ❌     | Fire detection and environmental alerts  |
-| IQAir API Integration                          | ❌     | Research-grade air quality               |
-| AmbeeData API Integration                      | ❌     | Pollen and allergen data                 |
-| Satellite Data APIs (NASA POWER, Sentinel Hub) | ❌     | Satellite imagery and data               |
+| NASA FIRMS Integration | ❌ | Fire detection and environmental alerts |
+| IQAir API Integration | ❌ | Research-grade air quality |
+| AmbeeData API Integration | ❌ | Pollen and allergen data |
+| Satellite Data APIs (NASA POWER, Sentinel Hub) | ❌ | Satellite imagery and data |
 
 ### Data Storage & Management
 
@@ -476,6 +464,16 @@ This document tracks all features for the Urban Climate and Weather Application,
 | Wind Speed Display Fix       | `weatherService.js`           | Fixed missing Wind Speed in fallback data and standardized metric ID to `windSpeed`                      |
 | Metric Data Merging          | `ComparisonCards.jsx`         | Implemented logic to merge weather matrix with AQI breakdown data for complete comparison                |
 
+### ✅ Backend Data Collection Fixes (December 5, 2025 - Evening)
+
+| Issue                          | Component             | Description                                                                                                                           |
+| ------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Alerts Schema Validation       | `RealtimeData.js`     | Fixed MongoDB validation error - changed alerts schema from ambiguous array syntax to explicit subdocument schema                     |
+| OpenAQ API Deprecated          | `openAQCollector.js`  | Disabled OpenAQ collector - API returns HTTP 410 (Gone), endpoint has been deprecated                                                 |
+| Active Collectors Count        | `masterCollector.js`  | Updated from 8 to 7 data sources, removed OpenAQ from initialization and collection promises                                          |
+| Alert City Names               | `weatherService.js`   | Added city name to alert messages for better context (e.g., "Very Unhealthy AQI in Mumbai: 215" instead of "Very Unhealthy AQI: 215") |
+| Feature Tracking Documentation | `Feature_Tracking.md` | Created comprehensive documentation of known issues, fixed issues, and active data sources                                            |
+
 ### ⛔ UNRESOLVED - Too Buggy (Recharts Library Limitation)
 
 | Bug                    | Component        | Description                                                                   | Status        |
@@ -499,12 +497,262 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 ### ❌ Pending Implementation
 
-| Feature                         | Description                                             | Component        |
-| ------------------------------- | ------------------------------------------------------- | ---------------- |
-| Scatter Correlation Labels      | Show correlation coefficient (r-value) on scatter chart | `TrendChart.jsx` |
-| Export Scatter Data             | Allow exporting correlation analysis data               | `TrendChart.jsx` |
-| Scatter Legend                  | Better legend for multi-city scatter points             | `TrendChart.jsx` |
-| Map City Search in Compare Mode | Add searchable input on map when in compare mode        | `MapWidget.jsx`  |
+| Feature                    | Description                                             | Component        |
+| -------------------------- | ------------------------------------------------------- | ---------------- |
+| Scatter Correlation Labels | Show correlation coefficient (r-value) on scatter chart | `TrendChart.jsx` |
+| Export Scatter Data        | Allow exporting correlation analysis data               | `TrendChart.jsx` |
+| Scatter Legend             | Better legend for multi-city scatter points             | `TrendChart.jsx` |
+
+---
+
+## ⚠️ KNOWN ISSUES & LIMITATIONS
+
+### Data Collection Issues
+
+#### ❌ OpenAQ API Deprecated (UNFIXABLE - API Shutdown)
+
+**Status:** Removed from active collectors  
+**Date Identified:** December 5, 2025
+
+**Problem:**
+
+- OpenAQ v2 API returns HTTP 410 (Gone) for all requests
+- Error: `Request failed with status code 410`
+- Affects all cities - no data available from this source
+
+**Root Cause:**
+
+- The OpenAQ v2 API endpoint has been officially deprecated/shutdown
+- HTTP 410 status indicates the resource is permanently gone
+
+**Impact:**
+
+- Lost one air quality data source
+- System now collects from 7 sources instead of 8
+- Air quality data still available from:
+  - OpenMeteo-AQI ✅
+  - Google AQI ✅
+  - UrbanEmission ✅
+
+**Resolution:**
+
+- Disabled collector in `openAQCollector.js` (returns `null` immediately)
+- Removed from `masterCollector.js` initialization
+- Updated logs to show "7 data sources"
+
+**Future Fix Options:**
+
+1. **Migrate to OpenAQ v3 API** (if available)
+
+   - Check OpenAQ documentation for new API version
+   - Update `openAQCollector.js` with new endpoints
+   - Test with new API key/authentication if required
+
+2. **Find Alternative Air Quality Source**
+
+   - Consider IQAir API (research-grade data)
+   - Consider AirNow API (US EPA data)
+   - Consider CPCB (Central Pollution Control Board) for India-specific data
+
+3. **Community Data Integration**
+   - Integrate with PurpleAir sensor network
+   - Use citizen science air quality monitors
+
+**Implementation Effort:** Medium (2-3 days)
+
+- Requires API research and testing
+- May need new API keys/subscriptions
+- Schema updates if data format differs
+
+---
+
+#### ⚠️ WeatherUnion API Limited Coverage (PARTIALLY FIXABLE)
+
+**Status:** Active but with limited functionality  
+**Date Identified:** December 5, 2025
+
+**Problem:**
+
+- Returns HTTP 400 (Bad Request) for most cities
+- Error: `Request failed with status code 400`
+- Only works for cities with valid locality IDs
+
+**Root Cause:**
+
+- Using hardcoded locality IDs in `weatherUnionCollector.js`
+- Locality IDs may be invalid, outdated, or incorrect
+- WeatherUnion API requires specific locality IDs, not lat/lon
+
+**Current Hardcoded Localities:**
+
+```javascript
+{
+  'ZWL005764': { lat: 19.0760, lng: 72.8777, city: 'Mumbai' },
+  'ZWL001234': { lat: 28.7041, lng: 77.1025, city: 'Delhi' },
+  'ZWL009876': { lat: 12.9716, lng: 77.5946, city: 'Bangalore' },
+  // ... etc
+}
+```
+
+**Impact:**
+
+- Weather data not available from WeatherUnion for most cities
+- System gracefully falls back to other sources (IMD, OpenMeteo)
+- No critical functionality lost
+
+**Workaround:**
+
+- Backend continues to collect from other weather sources
+- Frontend displays available data without errors
+
+**Future Fix Options:**
+
+1. **Obtain Valid Locality IDs** (Recommended)
+
+   - Contact WeatherUnion support for locality ID list
+   - Request API documentation for locality lookup endpoint
+   - Update `_getLocalityMapping()` with correct IDs
+   - **Implementation Effort:** Low (1 day)
+
+2. **Implement Locality Lookup API**
+
+   - Add endpoint to query WeatherUnion for nearest locality
+   - Cache locality IDs in database for future use
+   - Update collector to dynamically fetch locality IDs
+   - **Implementation Effort:** Medium (2-3 days)
+
+3. **Replace with Alternative Weather API**
+   - Consider OpenWeatherMap (widely used, good coverage)
+   - Consider AccuWeather (high accuracy)
+   - Consider Weatherbit (comprehensive data)
+   - **Implementation Effort:** Medium (2-3 days)
+
+**Steps to Fix (Option 1 - Recommended):**
+
+```javascript
+// 1. Contact WeatherUnion support
+// 2. Get official locality ID list or lookup API
+// 3. Update weatherUnionCollector.js:
+
+_getLocalityMapping() {
+  // Replace with official locality IDs from WeatherUnion
+  return {
+    'CORRECT_ID_1': { lat: 19.0760, lng: 72.8777, city: 'Mumbai' },
+    'CORRECT_ID_2': { lat: 28.7041, lng: 77.1025, city: 'Delhi' },
+    // ... add all valid IDs
+  };
+}
+```
+
+---
+
+#### ✅ Alerts Schema Validation Error (FIXED)
+
+**Status:** Resolved  
+**Date Fixed:** December 5, 2025
+
+**Problem:**
+
+- MongoDB validation error when storing alerts
+- Error: `Cast to [string] failed for value "[\n  {\n    type: 'Very Unhealthy Air'..."`
+- Prevented OpenMeteo-AQI, UrbanEmission, and OpenCity data from being stored
+
+**Root Cause:**
+
+- Ambiguous schema definition in `RealtimeData.js`
+- Mongoose interpreted `type: String` as the field name, not the schema type
+
+```javascript
+// BEFORE (ambiguous)
+alerts: [
+  {
+    type: String, // Mongoose confused: is this a field or schema type?
+    level: String,
+    message: String,
+  },
+];
+```
+
+**Solution:**
+
+- Used explicit subdocument schema syntax
+
+```javascript
+// AFTER (explicit)
+alerts: [
+  {
+    type: { type: String }, // Clear: "type" field with String schema type
+    level: { type: String },
+    message: { type: String },
+  },
+];
+```
+
+**Impact Before Fix:**
+
+- 3 data sources failing to store data (OpenMeteo-AQI, UrbanEmission, OpenCity)
+- Alerts not being saved to database
+- Validation errors in server logs
+
+**Impact After Fix:**
+
+- All data sources storing successfully
+- Alerts properly saved as array of objects
+- No validation errors
+
+---
+
+#### ✅ Alert Messages Missing City Context (FIXED)
+
+**Status:** Resolved  
+**Date Fixed:** December 5, 2025
+
+**Problem:**
+
+- Alert messages didn't indicate which city they were for
+- User confusion when viewing alerts
+- Example: "Very Unhealthy Air" - which city?
+
+**Solution:**
+
+- Updated `generateFallbackAlerts()` in `weatherService.js`
+- Added `cityName` parameter
+- Appended city name to all alert messages
+
+**Before:**
+
+```
+"Very Unhealthy Air"
+"Very Unhealthy AQI: 215"
+```
+
+**After:**
+
+```
+"Very Unhealthy Air"
+"Very Unhealthy AQI in Mumbai: 215"
+```
+
+**Files Modified:**
+
+- `Frontend/services/weatherService.js` (lines 722-738)
+
+---
+
+### Active Data Sources Summary
+
+**Currently Operational: 7 out of 8 sources**
+
+| Source        | Status | Data Type   | Coverage  | Notes                                      |
+| ------------- | ------ | ----------- | --------- | ------------------------------------------ |
+| OpenMeteo     | ✅     | Weather     | Global    | Primary weather source                     |
+| IMD           | ✅     | Weather     | India     | Government source (via OpenMeteo fallback) |
+| WeatherUnion  | ⚠️     | Weather     | Limited   | Works only for hardcoded cities            |
+| KSNDMC        | ✅     | Weather     | Karnataka | State-specific data                        |
+| OpenAQ        | ❌     | Air Quality | None      | API deprecated (HTTP 410)                  |
+| Google AQI    | ✅     | Air Quality | Global    | Reliable AQI source                        |
+| UrbanEmission | ✅     | Air Quality | Urban     | With fallback data                         |
+| OpenCity      | ✅     | Urban Data  | Cities    | With fallback data                         |
 
 ---
 

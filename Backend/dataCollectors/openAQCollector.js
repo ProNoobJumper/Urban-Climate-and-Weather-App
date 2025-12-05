@@ -36,6 +36,12 @@ class OpenAQCollector {
    * @returns {Object|null} Air quality data or null on error
    */
   async fetchAirQualityData(lat, lng, cityName) {
+    // OpenAQ v2 API has been deprecated (returns HTTP 410)
+    // This collector is disabled until a new API version is available
+    logger.debug(`${this.name}: API deprecated (HTTP 410), skipping`);
+    return null;
+    
+    /* DEPRECATED CODE - OpenAQ v2 API no longer available
     try {
       if (!validateCoordinates(lat, lng)) {
         logger.warn(`${this.name}: Invalid coordinates for ${cityName}`);
@@ -87,6 +93,7 @@ class OpenAQCollector {
       logger.error(`${this.name} AQI Error for ${cityName}:`, error.message);
       return null;
     }
+    */
   }
 
   /**
