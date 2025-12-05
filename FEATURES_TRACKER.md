@@ -508,6 +508,76 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 ---
 
+## ⚠️ PROJECT CONSTRAINTS & LIMITATIONS
+
+### Time Constraints & Technical Complexity
+
+Due to **project timeline limitations** and **technical complexity**, the following categories of features could not be completed:
+
+#### 🚧 In Progress Features (19 features)
+
+These features were started but not fully implemented due to time constraints:
+
+- Multi-source forecast models
+- Role-based access control enforcement
+- Advanced ML-based predictions
+- Comprehensive database indexing
+- Enhanced heatmap visualizations
+- Research upload UI and admin verification panel
+
+#### ❌ Not Started Features (77 features)
+
+These features were planned but not implemented due to:
+
+- **Time constraints**: Limited development timeline prevented implementation
+- **Technical complexity**: Features requiring extensive research, third-party integrations, or advanced algorithms
+- **Resource limitations**: Features requiring additional APIs, infrastructure, or specialized expertise
+
+Key unimplemented features include:
+
+- Additional API integrations (NASA FIRMS, IQAir, AmbeeData, Satellite Data)
+- Long-term historical data (1000+ years)
+- Advanced visualizations (bar charts, heatmaps, scatter plots, box plots, radial charts)
+- Data export system (CSV, Excel, JSON, PDF)
+- Alert and notification system
+- Role-based interfaces for different user types
+- PWA features and offline mode
+- Email verification and password reset
+- Multi-language support
+
+#### 🔄 Needs Improvement Features (11 features)
+
+These features exist but require refinement due to time constraints:
+
+- ML-based prediction algorithms (currently using simple statistical models)
+- Data quality scoring system
+- XSS protection enhancements
+- Query optimization
+- Touch gesture support
+- Client-side caching
+- Map controls optimization
+
+### Development Priorities
+
+Given the constraints, the development team focused on:
+
+1. ✅ **Core functionality**: Real-time and historical data collection from 8 APIs
+2. ✅ **Essential UI/UX**: Interactive map, multi-source comparison, trend visualization
+3. ✅ **User authentication**: Email/password and Google OAuth integration
+4. ✅ **Data transparency**: Multi-source display without averaging
+5. ✅ **Performance**: Redis caching and optimized queries
+
+### Future Recommendations
+
+To complete the remaining features, the following would be required:
+
+- Extended development timeline (3-6 months)
+- Additional team members with specialized skills (ML, data visualization, DevOps)
+- Budget for premium API subscriptions
+- Infrastructure upgrades for advanced features (TimescaleDB, CDN, load balancing)
+
+---
+
 ## 🎯 NEXT PRIORITY FIXES
 
 1. **Scatter Tooltip Bug** - The tooltip in correlation analysis scatter chart shows wrong source/city when multiple are selected
