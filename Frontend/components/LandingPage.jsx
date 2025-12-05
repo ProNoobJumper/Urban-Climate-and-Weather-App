@@ -43,15 +43,15 @@ const LandingPage = ({ onLoginClick, onRegisterClick }) => {
           <div className="flex flex-wrap justify-center gap-8 text-sm text-slate-400">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-400" />
-              <span>Free Forever</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-400" />
-              <span>No Credit Card Required</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-400" />
               <span>Real-time Updates</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-400" />
+              <span>AI-Powered Insights</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-400" />
+              <span>Multi-Source Data</span>
             </div>
           </div>
         </div>
