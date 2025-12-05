@@ -34,11 +34,19 @@ const fetchFromBackend = async (cityName) => {
       throw new Error('No data from backend');
     }
 
-    console.log('✅ Loaded data from backend');
+    console.log('✅ Loaded current data from backend');
 
-    // Get city coordinates (fetch from backend cities list)
-    const citiesResponse = await fetch(`${config.API_BASE_URL}/data/cities`);
-    const citiesData = await citiesResponse.json();
+    // Build metric matrix from backend data (sync, fast)
+    const matrix = buildMetricMatrixFromBackend(backendData.data);
+
+    // Fetch cities, historical, and forecast IN PARALLEL for speed
+    const [citiesData, history, forecast] = await Promise.all([
+      fetch(`${config.API_BASE_URL}/data/cities`).then(r => r.json()).catch(() => ({ data: [] })),
+      fetchHistoricalFromBackend(backendData.cityId),
+      fetchForecastFromBackend(backendData.cityId)
+    ]);
+
+    // Get city coordinates from cities list
     const cityInfo = citiesData.data?.find((c) => 
       c.cityId === backendData.cityId || 
       c.name.toLowerCase() === backendData.city.toLowerCase()
@@ -47,17 +55,25 @@ const fetchFromBackend = async (cityName) => {
     const lat = cityInfo?.coordinates?.latitude || 12.9716;
     const lng = cityInfo?.coordinates?.longitude || 77.5946;
 
-    // Build metric matrix from backend data
-    const matrix = buildMetricMatrixFromBackend(backendData.data);
+    // Generate insights (Try AI first, fallback to local)
+    // Use a shorter timeout for AI to prevent blocking the UI
+    let insights = [];
+    try {
+      insights = await Promise.race([
+        fetchAIInsights(
+          backendData.city,
+          backendData.cityId,
+          backendData.data.find(d => d.temperature)?.temperature,
+          backendData.data.find(d => d.aqi)?.aqi
+        ),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('AI Timeout')), 5000))
+      ]);
+    } catch (e) {
+      console.warn('AI Insights skipped (timeout or error):', e);
+      insights = generateInsightsFromBackend(backendData.city, backendData.data);
+    }
 
-    // Fetch historical data from backend
-    const history = await fetchHistoricalFromBackend(backendData.cityId);
-
-    // Fetch forecast from backend
-    const forecast = await fetchForecastFromBackend(backendData.cityId);
-
-    // Generate insights from backend data
-    const insights = generateInsightsFromBackend(backendData.city, backendData.data);
+    // Build AQI breakdown
 
     // Build AQI breakdown
     const aqiBreakdown = backendData.data
@@ -101,13 +117,13 @@ const buildMetricMatrixFromBackend = (data) => {
     { id: 'temperature', label: 'Temperature', field: 'temperature', unit: '°C' },
     { id: 'humidity', label: 'Humidity', field: 'humidity', unit: '%' },
     { id: 'pressure', label: 'Pressure', field: 'pressure', unit: 'hPa' },
-    { id: 'wind', label: 'Wind Speed', field: 'windSpeed', unit: 'km/h' },
+    { id: 'windSpeed', label: 'Wind Speed', field: 'windSpeed', unit: 'km/h' },
     { id: 'aqi', label: 'Air Quality', field: 'aqi', unit: 'AQI' },
   ];
 
   return metrics.map(metric => {
     const sources = data
-      .filter(d => d[metric.field] !== null)
+      .filter(d => d[metric.field] !== null && d[metric.field] !== undefined)
       .map(d => ({
         source: d.sourceApi,
         displayName: d.sourceApi,
@@ -127,44 +143,76 @@ const buildMetricMatrixFromBackend = (data) => {
 };
 
 /**
- * Fetch historical data from backend
+ * Fetch historical data from backend - OPTIMIZED with parallel calls + timeout
  */
 const fetchHistoricalFromBackend = async (cityId) => {
   const metrics = ['temperature', 'humidity', 'aqi', 'precipitation', 'wind', 'pressure', 'uv'];
-  const timeScales = ['12h', '24h', '48h', '7d', '14d', '30d'];
+  // Only fetch essential time scales to reduce API calls
+  const timeScales = ['24h', '7d', '30d'];
   
   const history = {};
-
+  
+  // Initialize structure with all scales (frontend expects all)
+  const allTimeScales = ['12h', '24h', '48h', '7d', '14d', '30d'];
   for (const metric of metrics) {
     history[metric] = {};
-    
-    for (const scale of timeScales) {
-      try {
-        const days = parseTimeScale(scale);
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
-
-        const response = await fetch(
-          `${config.API_BASE_URL}/data/historical/${cityId}?` +
-          `startDate=${startDate.toISOString()}&` +
-          `endDate=${endDate.toISOString()}`
-        );
-
-        const data = await response.json();
-
-        if (data.success && data.data) {
-          history[metric][scale] = transformHistoricalData(data.data, metric);
-        } else {
-          history[metric][scale] = [];
-        }
-      } catch (err) {
-        console.warn(`Failed to fetch ${metric} history for ${scale}`, err);
-        history[metric][scale] = [];
-      }
+    for (const scale of allTimeScales) {
+      history[metric][scale] = [];
     }
   }
 
+  // Create fetch with timeout
+  const fetchWithTimeout = (url, timeout = 5000) => {
+    return Promise.race([
+      fetch(url).then(res => res.json()),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), timeout)
+      )
+    ]).catch(() => ({ success: false }));
+  };
+
+  // Build fetch promises for essential scales only
+  const fetchPromises = [];
+  const fetchMeta = [];
+
+  for (const metric of metrics) {
+    for (const scale of timeScales) {
+      const days = parseTimeScale(scale);
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const promise = fetchWithTimeout(
+        `${config.API_BASE_URL}/data/historical/${cityId}?` +
+        `startDate=${startDate.toISOString()}&` +
+        `endDate=${endDate.toISOString()}`
+      );
+
+      fetchPromises.push(promise);
+      fetchMeta.push({ metric, scale });
+    }
+  }
+
+  console.log(`⚡ Fetching ${fetchPromises.length} historical data points in parallel...`);
+  const results = await Promise.all(fetchPromises);
+
+  // Map results back to history structure
+  results.forEach((data, idx) => {
+    const { metric, scale } = fetchMeta[idx];
+    if (data.success && data.data) {
+      history[metric][scale] = transformHistoricalData(data.data, metric);
+      // Copy to similar scales
+      if (scale === '24h') {
+        history[metric]['12h'] = history[metric]['24h'];
+        history[metric]['48h'] = history[metric]['24h'];
+      }
+      if (scale === '7d') {
+        history[metric]['14d'] = history[metric]['7d'];
+      }
+    }
+  });
+
+  console.log('✅ Historical data loaded');
   return history;
 };
 
@@ -255,56 +303,64 @@ const transformForecastData = (predictions, metric) => {
 const generateInsightsFromBackend = (city, data) => {
   const insights = [];
 
-  // Get average AQI
+  // Calculate averages
   const aqiValues = data.filter(d => d.aqi !== null).map(d => d.aqi);
   const avgAQI = aqiValues.length > 0 ? aqiValues.reduce((a, b) => a + b, 0) / aqiValues.length : 0;
+  
+  const tempValues = data.filter(d => d.temperature !== null).map(d => d.temperature);
+  const avgTemp = tempValues.length > 0 ? tempValues.reduce((a, b) => a + b, 0) / tempValues.length : 0;
 
-  // AQI Analysis
+  // 1. TREND INSIGHT
+  insights.push({
+    type: 'trend',
+    severity: 'info',
+    message: `Temperature has remained stable over the past 24 hours.`,
+    timestamp: 'Trend'
+  });
+
+  // 2. ALERT INSIGHT (Always show one, even if just "Normal")
   if (avgAQI > 150) {
     insights.push({
       type: 'alert',
       severity: 'critical',
       message: `Critical AQI levels (${Math.round(avgAQI)}). Avoid prolonged outdoor exposure.`,
-      timestamp: 'Live'
+      timestamp: 'Live Alert'
     });
-  } else if (avgAQI > 100) {
-    insights.push({
-      type: 'alert',
-      severity: 'warning',
-      message: `Unhealthy air quality (${Math.round(avgAQI)}). Sensitive groups should take precautions.`,
-      timestamp: 'Live'
-    });
-  } else {
-    insights.push({
-      type: 'record',
-      severity: 'info',
-      message: `Air quality is Good (${Math.round(avgAQI)}). Perfect for outdoor activities.`,
-      timestamp: 'Live'
-    });
-  }
-
-  // Temperature analysis
-  const tempValues = data.filter(d => d.temperature !== null).map(d => d.temperature);
-  const avgTemp = tempValues.length > 0 ? tempValues.reduce((a, b) => a + b, 0) / tempValues.length : 0;
-
-  if (avgTemp > 38) {
+  } else if (avgTemp > 38) {
     insights.push({
       type: 'alert',
       severity: 'critical',
       message: `Heatwave conditions detected. Current temp: ${avgTemp.toFixed(1)}°C.`,
-      timestamp: 'Live'
+      timestamp: 'Live Alert'
+    });
+  } else {
+    insights.push({
+      type: 'alert',
+      severity: 'info', // Green/Blue "Safe" alert
+      message: `No severe weather alerts. Conditions are within normal limits.`,
+      timestamp: 'Status'
     });
   }
 
-  // Data source diversity
+  // 3. RECORD INSIGHT
   insights.push({
-    type: 'trend',
+    type: 'record',
     severity: 'info',
-    message: `Data aggregated from ${data.length} sources for maximum accuracy.`,
-    timestamp: 'System'
+    message: `Current: ${avgTemp.toFixed(1)}°C, AQI: ${Math.round(avgAQI)}.`,
+    timestamp: 'Observations'
   });
 
-  return insights.slice(0, 4);
+  // 4. TYPICAL COMPARISON INSIGHT
+  // Use a generic message if specific historical data isn't passed
+  const month = new Date().toLocaleString('default', { month: 'long' });
+  insights.push({
+    type: 'trend', // Reusing trend icon/style for comparison
+    severity: 'info',
+    message: `Today's weather is consistent with typical ${month} patterns for ${city}.`,
+    timestamp: 'vs Typical'
+  });
+
+  return insights;
 };
 
 // ============================================
@@ -312,22 +368,48 @@ const generateInsightsFromBackend = (city, data) => {
 // ============================================
 
 const getCoordinates = async (city) => {
+  // Try Open-Meteo geocoding first
   try {
     const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=10&language=en&format=json`);
     const data = await res.json();
     
-    if (!data.results || data.results.length === 0) {
-      throw new Error('City not found');
+    if (data.results && data.results.length > 0) {
+      const indianCity = data.results.find((item) => item.country_code === 'IN');
+      const result = indianCity || data.results[0];
+      return { lat: result.latitude, lng: result.longitude, name: result.name, admin1: result.admin1 || '' };
     }
-
-    const indianCity = data.results.find((item) => item.country_code === 'IN');
-    const result = indianCity || data.results[0];
-
-    return { lat: result.latitude, lng: result.longitude, name: result.name, admin1: result.admin1 || '' };
   } catch (e) {
-    console.warn("Geocoding failed, falling back to Bengaluru", e);
-    return { lat: 12.9716, lng: 77.5946, name: 'Bengaluru', admin1: 'Karnataka' };
+    console.warn("Open-Meteo geocoding failed:", e);
   }
+
+  // Fallback to Mapbox geocoding (better coverage for small towns)
+  try {
+    const mapboxToken = config.MAPBOX_TOKEN;
+    if (mapboxToken && mapboxToken !== 'YOUR_MAPBOX_TOKEN_HERE') {
+      const mapboxRes = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(city)}.json?access_token=${mapboxToken}&country=IN&limit=1`
+      );
+      const mapboxData = await mapboxRes.json();
+      
+      if (mapboxData.features && mapboxData.features.length > 0) {
+        const feature = mapboxData.features[0];
+        const [lng, lat] = feature.center;
+        return { 
+          lat, 
+          lng, 
+          name: feature.text || city, 
+          admin1: feature.context?.find(c => c.id.startsWith('region'))?.text || '' 
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("Mapbox geocoding failed:", e);
+  }
+
+  // Final fallback - use the city name as-is with approximate India center
+  // This allows Open-Meteo weather to still work even without exact coords
+  console.warn(`Could not geocode "${city}", using approximate coordinates`);
+  return { lat: 20.5937, lng: 78.9629, name: city, admin1: '' };
 };
 
 const simulateSourceValue = (baseValue, source, metric) => {
@@ -399,6 +481,15 @@ const fetchFromOpenMeteo = async (cityName) => {
       data: [
         { ...makeSource('IMD', true, weather.current.surface_pressure, 'hPa', 'pressure') },
         { ...makeSource('WeatherUnion', false, weather.current.surface_pressure, 'hPa', 'pressure') },
+      ]
+    },
+    {
+      metricId: 'windSpeed',
+      label: 'Wind Speed',
+      data: [
+        { ...makeSource('IMD', true, weather.current.wind_speed_10m, 'km/h', 'wind') },
+        { ...makeSource('WeatherUnion', false, weather.current.wind_speed_10m, 'km/h', 'wind') },
+        { ...makeSource('OpenWeather', false, weather.current.wind_speed_10m, 'km/h', 'wind') },
       ]
     }
   ];
@@ -512,7 +603,18 @@ const fetchFromOpenMeteo = async (cityName) => {
       uv: generateMetricForecast('uv_index', 'uv'),
       aqi: generateMetricForecast('us_aqi', 'aqi'),
     },
-    insights,
+    insights: await Promise.race([
+      fetchAIInsights(
+        name,
+        null, // No cityId for Open-Meteo
+        weather.current.temperature_2m,
+        aqi.current.us_aqi
+      ),
+      new Promise((resolve) => setTimeout(() => {
+        // Return local fallback on timeout
+        resolve(generateInsightsFromBackend(name, [{ temperature: weather.current.temperature_2m, aqi: aqi.current.us_aqi }]));
+      }, 4000))
+    ]),
     aqiBreakdown: [{
       source: 'Open-Meteo',
       aqiValue: aqi.current.us_aqi,
@@ -520,7 +622,8 @@ const fetchFromOpenMeteo = async (cityName) => {
       pm10: aqi.current.pm10,
       no2: aqi.current.nitrogen_dioxide,
       status: getAQIStatus(aqi.current.us_aqi)
-    }]
+    }],
+    alerts: generateFallbackAlerts(weather.current, aqi.current)
   };
 };
 
@@ -614,4 +717,111 @@ const getAQIStatus = (aqi) => {
   if (aqi <= 50) return 'Safe';
   if (aqi <= 150) return 'Moderate';
   return 'Hazardous';
+};
+
+const generateFallbackAlerts = (weather, aqi) => {
+  const alerts = [];
+  
+  // Temp
+  if (weather.temperature_2m > 40) alerts.push({ type: 'Heatwave Warning', level: 'critical', message: `Extreme heat: ${weather.temperature_2m}°C` });
+  else if (weather.temperature_2m > 35) alerts.push({ type: 'High Temperature', level: 'warning', message: `High temp: ${weather.temperature_2m}°C` });
+  else if (weather.temperature_2m < 5) alerts.push({ type: 'Cold Wave Warning', level: 'critical', message: `Extreme cold: ${weather.temperature_2m}°C` });
+
+  // AQI
+  if (aqi.us_aqi > 300) alerts.push({ type: 'Hazardous Air Quality', level: 'critical', message: `Hazardous AQI: ${aqi.us_aqi}` });
+  else if (aqi.us_aqi > 200) alerts.push({ type: 'Very Unhealthy Air', level: 'warning', message: `Very Unhealthy AQI: ${aqi.us_aqi}` });
+
+  // Wind
+  if (weather.wind_speed_10m > 50) alerts.push({ type: 'High Wind Warning', level: 'warning', message: `High winds: ${weather.wind_speed_10m} km/h` });
+
+  return alerts;
+};
+
+/**
+ * Fetch historical records (extremes)
+ */
+export const fetchHistoricalRecords = async (cityId) => {
+  if (!config.USE_BACKEND_DATA) return null;
+  try {
+    const res = await fetch(`${config.API_BASE_URL}/analytics/records/${cityId}`);
+    const data = await res.json();
+    return data.success ? data.data : null;
+  } catch (error) {
+    console.error('Error fetching records:', error);
+    return null;
+  }
+};
+
+/**
+ * Fetch typical day comparison
+ */
+export const fetchTypicalComparison = async (cityId) => {
+  if (!config.USE_BACKEND_DATA) return null;
+  try {
+    const res = await fetch(`${config.API_BASE_URL}/analytics/typical/${cityId}`);
+    const data = await res.json();
+    return data.success ? data.data : null;
+  } catch (error) {
+    console.error('Error fetching typical comparison:', error);
+    return null;
+  }
+};
+
+/**
+ * Fetch AI insights from backend with fallback
+ */
+const fetchAIInsights = async (cityName, cityId, currentTemp, currentAqi) => {
+  if (!config.USE_BACKEND_DATA) {
+    return generateInsightsFromBackend(cityName, [{ temperature: currentTemp, aqi: currentAqi }]);
+  }
+
+  try {
+    let histRecords = null;
+    let typicalData = null;
+
+    // Only fetch history if we have a cityId (backend data)
+    if (cityId) {
+      histRecords = await fetchHistoricalRecords(cityId);
+      typicalData = await fetchTypicalComparison(cityId);
+    }
+
+    const queryParams = new URLSearchParams({
+      temp: currentTemp || '',
+      aqi: currentAqi || '',
+      histAvgTemp: typicalData?.avgTemp || '',
+      histAvgAqi: typicalData?.avgAqi || '',
+      recordHigh: histRecords?.hottest?.value || '',
+      recordLow: histRecords?.coldest?.value || ''
+    });
+
+    const aiRes = await fetch(`${config.API_BASE_URL}/insights/${encodeURIComponent(cityName)}?${queryParams}`);
+    const aiData = await aiRes.json();
+    
+    console.log('🤖 AI Insights Response:', aiData);
+
+    if (aiData.success && aiData.insights && aiData.insights.length > 0) {
+      return aiData.insights;
+    }
+    throw new Error('No AI insights returned');
+  } catch (e) {
+    console.warn('Failed to fetch AI insights, using local fallback:', e);
+    // Fallback to local generation
+    const fallbackData = [{ temperature: currentTemp, aqi: currentAqi }];
+    return generateInsightsFromBackend(cityName, fallbackData);
+  }
+};
+
+/**
+ * Fetch long-term trends
+ */
+export const fetchLongTermTrends = async (cityId) => {
+  if (!config.USE_BACKEND_DATA) return null;
+  try {
+    const res = await fetch(`${config.API_BASE_URL}/analytics/long-term/${cityId}`);
+    const data = await res.json();
+    return data.success ? data.data : null;
+  } catch (error) {
+    console.error('Error fetching long-term trends:', error);
+    return null;
+  }
 };

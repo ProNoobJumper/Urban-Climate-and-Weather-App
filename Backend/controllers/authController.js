@@ -277,10 +277,172 @@ const updateProfile = async (req, res) => {
   }
 };
 
+/**
+ * Add city to favorites
+ * @route POST /api/auth/favorites/:cityId
+ * @access Protected
+ */
+const addFavorite = async (req, res) => {
+  try {
+    const { cityId } = req.params;
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Check if already favorited
+    if (user.favorites && user.favorites.includes(cityId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'City already in favorites'
+      });
+    }
+
+    if (!user.favorites) user.favorites = [];
+    user.favorites.push(cityId);
+    await user.save();
+
+    logger.info(`Favorite added: ${cityId} by ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Added to favorites',
+      favorites: user.favorites
+    });
+  } catch (error) {
+    logger.error('Add favorite error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Remove city from favorites
+ * @route DELETE /api/auth/favorites/:cityId
+ * @access Protected
+ */
+const removeFavorite = async (req, res) => {
+  try {
+    const { cityId } = req.params;
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.favorites) {
+      user.favorites = user.favorites.filter(fav => fav !== cityId);
+      await user.save();
+    }
+
+    logger.info(`Favorite removed: ${cityId} by ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Removed from favorites',
+      favorites: user.favorites || []
+    });
+  } catch (error) {
+    logger.error('Remove favorite error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get user's favorite cities with current weather
+ * @route GET /api/auth/favorites
+ * @access Protected
+ */
+const getFavorites = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const RealtimeData = require('../models/RealtimeData');
+
+    // Get current weather for each favorite city
+    const favoritesWithWeather = await Promise.all(
+      (user.favorites || []).map(async (cityId) => {
+        const weatherData = await RealtimeData.findOne({ cityId })
+          .sort({ timestamp: -1 })
+          .limit(1);
+
+        return {
+          cityId,
+          weather: weatherData || null
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      favorites: favoritesWithWeather
+    });
+  } catch (error) {
+    logger.error('Get favorites error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Google OAuth callback
+ * @route GET /api/auth/google/callback
+ */
+const googleCallback = (req, res) => {
+  try {
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: req.user._id, userType: req.user.userType },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    );
+
+    logger.info(`Google OAuth successful for: ${req.user.email}`);
+
+    // Redirect to frontend with token
+    const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendURL}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
+      id: req.user._id,
+      email: req.user.email,
+      fullName: req.user.fullName,
+      favorites: req.user.favorites
+    }))}`);
+  } catch (error) {
+    logger.error('Google callback error:', error.message);
+    const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendURL}/auth/callback?error=authentication_failed`);
+  }
+};
+
 module.exports = {
   register,
   login,
   getProfile,
   getRoles,
-  updateProfile
+  updateProfile,
+  addFavorite,
+  removeFavorite,
+  getFavorites,
+  googleCallback
 };

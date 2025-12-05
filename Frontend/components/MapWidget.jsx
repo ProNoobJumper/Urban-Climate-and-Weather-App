@@ -2,23 +2,27 @@ import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Thermometer, CloudRain, Wind, X } from 'lucide-react';
-import clsx from 'clsx';
 import { config } from '../config';
 
 mapboxgl.accessToken = config.MAPBOX_TOKEN;
 
-export const MapWidget = ({ cityData, cityName, onCitySelect, onError }) => {
+export const MapWidget = ({ cityData, cityName, onCitySelect, onCompareSelect, onError, comparisonMode, comparisonCity, comparisonData }) => {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef([]);
-  const dropdownRef = useRef(null);
   const userInitiatedZoomRef = useRef(false); // Flag to track if user initiated the zoom
   
-  const [activeLayer, setActiveLayer] = useState('none');
+  // Refs to track current props for use in click handler (avoids stale closure)
+  const comparisonModeRef = useRef(comparisonMode);
+  const onCompareSelectRef = useRef(onCompareSelect);
+  
+  // Keep refs in sync with props
+  useEffect(() => {
+    comparisonModeRef.current = comparisonMode;
+    onCompareSelectRef.current = onCompareSelect;
+  }, [comparisonMode, onCompareSelect]);
+  
   const [isMapLoaded, setIsMapLoaded] = useState(false);
-  const [timeMode, setTimeMode] = useState('current');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // Initialize Mapbox map
   useEffect(() => {
@@ -55,16 +59,23 @@ export const MapWidget = ({ cityData, cityName, onCitySelect, onError }) => {
           
           if (data.features && data.features.length > 0) {
             const feature = data.features[0];
-            const cityName = feature.text;
+            const selectedCityName = feature.text;
             const cityCenter = feature.center;
             const placeType = feature.place_type?.[0];
 
             // Accept 'place' type which includes cities and towns, but not villages
             if (placeType === 'place') {
               userInitiatedZoomRef.current = true; // Mark as user-initiated
-              flyToCity(cityCenter, cityName);
-              if (onCitySelect) {
-                onCitySelect(cityName);
+              
+              // Route to comparison or main city based on mode (use refs for current values)
+              if (comparisonModeRef.current && onCompareSelectRef.current) {
+                console.log('🔀 Selecting comparison city from map:', selectedCityName);
+                // Don't fly to city for comparison - will fit bounds later
+                onCompareSelectRef.current(selectedCityName);
+              } else if (onCitySelect) {
+                console.log('📍 Selecting main city from map:', selectedCityName);
+                flyToCity(cityCenter, selectedCityName);
+                onCitySelect(selectedCityName);
               }
             } else {
               if (onError) {
@@ -146,18 +157,24 @@ export const MapWidget = ({ cityData, cityName, onCitySelect, onError }) => {
     }, 600);
   };
 
-  const addCityMarker = (coordinates, cityName) => {
+  const addCityMarker = (coordinates, markerCityName, isComparison = false) => {
     if (!mapInstanceRef.current) return;
 
-    markersRef.current.forEach(marker => marker.remove());
-    markersRef.current = [];
+    // Only remove markers of the same type (main vs comparison)
+    const markerKey = isComparison ? 'comparison' : 'main';
+    const existingMarker = markersRef.current.find(m => m._type === markerKey);
+    if (existingMarker) {
+      existingMarker.remove();
+      markersRef.current = markersRef.current.filter(m => m._type !== markerKey);
+    }
 
-    // Get temperature and AQI from cityData if available
-    const tempData = cityData?.matrix?.find(m => m.metricId === 'temperature');
-    const aqiData = cityData?.aqiBreakdown?.[0];
+    // Get data based on marker type
+    const sourceData = isComparison ? comparisonData : cityData;
+    const tempData = sourceData?.matrix?.find(m => m.metricId === 'temperature');
+    const aqiDataItem = sourceData?.aqiBreakdown?.[0];
     
     const temperature = tempData?.data?.[0]?.value || '--';
-    const aqiValue = aqiData?.aqiValue || '--';
+    const aqiValue = aqiDataItem?.aqiValue || '--';
     
     // Determine AQI color
     let aqiColor = '#10b981'; // green
@@ -165,32 +182,62 @@ export const MapWidget = ({ cityData, cityName, onCitySelect, onError }) => {
     else if (aqiValue > 100) aqiColor = '#f59e0b'; // orange
     else if (aqiValue > 50) aqiColor = '#eab308'; // yellow
 
+    // Different border colors for main vs comparison
+    const borderColor = isComparison ? 'border-orange-500' : 'border-indigo-500';
+    const headerBg = isComparison ? 'bg-orange-500/10' : 'bg-indigo-500/10';
+    const labelBadge = isComparison 
+      ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-medium">Compare</span>' 
+      : '<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 font-medium">Main</span>';
+
+    // Position offset for comparison marker to avoid overlap - use inline styles
+    const topPosition = isComparison ? '130px' : '16px';
+
     const el = document.createElement('div');
     el.className = 'city-marker marker-bounce';
+    el.style.cssText = `position: absolute; left: 16px; top: ${topPosition}; z-index: 500;`;
     el.innerHTML = `
-      <div class="bg-slate-900/95 border border-indigo-500 rounded-lg px-4 py-3 shadow-2xl backdrop-blur-sm min-w-[180px]">
-        <h3 class="text-white font-semibold text-base mb-2 border-b border-slate-700 pb-1">${cityName}</h3>
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-400">Temperature</span>
-            <span class="text-sm font-bold text-orange-400">${temperature}°C</span>
+      <div style="background: rgba(15, 23, 42, 0.95); border: 2px solid ${isComparison ? '#f97316' : '#6366f1'}; border-radius: 8px; padding: 8px 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); min-width: 140px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid #334155; padding-bottom: 6px; margin: -8px -12px 6px -12px; padding: 8px 12px 6px 12px; border-radius: 6px 6px 0 0; background: ${isComparison ? 'rgba(249, 115, 22, 0.1)' : 'rgba(99, 102, 241, 0.1)'};">
+          <h3 style="color: white; font-weight: 600; font-size: 14px; margin: 0;">${markerCityName}</h3>
+          <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: ${isComparison ? 'rgba(249, 115, 22, 0.2)' : 'rgba(99, 102, 241, 0.2)'}; color: ${isComparison ? '#fb923c' : '#818cf8'}; font-weight: 500;">${isComparison ? 'Compare' : 'Main'}</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 12px; color: #94a3b8;">Temperature</span>
+            <span style="font-size: 12px; font-weight: 700; color: #fb923c;">${temperature}°C</span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-xs text-slate-400">AQI</span>
-            <span class="text-sm font-bold" style="color: ${aqiColor}">${aqiValue}</span>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 12px; color: #94a3b8;">AQI</span>
+            <span style="font-size: 12px; font-weight: 700; color: ${aqiColor};">${aqiValue}</span>
           </div>
         </div>
       </div>
     `;
 
-    const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+    // Add as fixed UI element on map instead of marker
+    if (mapContainerRef.current) {
+      // Remove existing card of same type
+      const existingCard = mapContainerRef.current.querySelector(`.city-card-${markerKey}`);
+      if (existingCard) existingCard.remove();
+      
+      el.classList.add(`city-card-${markerKey}`);
+      mapContainerRef.current.appendChild(el);
+    }
+
+    // Still add a simple pin marker at location
+    const pinEl = document.createElement('div');
+    pinEl.className = 'w-4 h-4 rounded-full border-2 border-white shadow-lg';
+    pinEl.style.backgroundColor = isComparison ? '#f97316' : '#6366f1';
+    
+    const marker = new mapboxgl.Marker({ element: pinEl, anchor: 'center' })
       .setLngLat(coordinates)
       .addTo(mapInstanceRef.current);
 
+    marker._type = markerKey;
     markersRef.current.push(marker);
   };
 
-  // Only zoom when data loads if it wasn't user-initiated (e.g., from geolocation)
+  // Update markers when main city data changes
   useEffect(() => {
     console.log('🔍 cityData changed:', cityName, 'userInitiated:', userInitiatedZoomRef.current);
     
@@ -202,97 +249,104 @@ export const MapWidget = ({ cityData, cityName, onCitySelect, onError }) => {
       } else {
         // User already initiated zoom, just update marker with data
         console.log('🎯 Updating marker only (user already zoomed):', cityName);
-        // Wait a bit for zoom animation to complete, then add marker with data
         setTimeout(() => {
-          addCityMarker([cityData.lng, cityData.lat], cityName);
+          addCityMarker([cityData.lng, cityData.lat], cityName, false);
         }, 100);
         userInitiatedZoomRef.current = false; // Reset flag
       }
     }
   }, [cityData, cityName, isMapLoaded]);
 
+  // Reset map to India view when entering comparison mode (before 2nd city is selected)
   useEffect(() => {
-    if (!mapInstanceRef.current || !isMapLoaded) return;
-
-    ['temp-layer', 'rain-layer', 'aqi-layer'].forEach(layerId => {
-      if (mapInstanceRef.current.getLayer(layerId)) {
-        mapInstanceRef.current.setLayoutProperty(layerId, 'visibility', 'none');
-      }
-    });
-
-    if (activeLayer !== 'none') {
-      const layerConfig = getLayerConfig(activeLayer);
-      if (layerConfig) {
-        addOrUpdateWeatherLayer(layerConfig);
-      }
-    }
-  }, [activeLayer, isMapLoaded, timeMode]);
-
-  const getLayerConfig = (layerName) => {
-    const timestamp = timeMode === 'current' ? 'now' : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    
-    const configs = {
-      'temp-heat': {
-        id: 'temp-layer',
-        tiles: `https://api.tomorrow.io/v4/map/tile/{z}/{x}/{y}/temperature/${timestamp}.png?apikey=${config.TOMORROW_API_KEY}`,
-        opacity: 0.75
-      },
-      'precip-radar': {
-        id: 'rain-layer',
-        tiles: `https://api.tomorrow.io/v4/map/tile/{z}/{x}/{y}/precipitationIntensity/${timestamp}.png?apikey=${config.TOMORROW_API_KEY}`,
-        opacity: 0.8
-      },
-      'aqi-heat': {
-        id: 'aqi-layer',
-        tiles: `https://api.tomorrow.io/v4/map/tile/{z}/{x}/{y}/particulateMatter25/${timestamp}.png?apikey=${config.TOMORROW_API_KEY}`,
-        opacity: 0.7
-      }
-    };
-
-    return configs[layerName];
-  };
-
-  const addOrUpdateWeatherLayer = (layerConfig) => {
-    if (!mapInstanceRef.current) return;
-
-    const map = mapInstanceRef.current;
-
-    if (!map.getSource(layerConfig.id)) {
-      map.addSource(layerConfig.id, {
-        type: 'raster',
-        tiles: [layerConfig.tiles],
-        tileSize: 256
+    if (mapInstanceRef.current && isMapLoaded && comparisonMode && !comparisonCity) {
+      console.log('🔄 Comparison mode activated - resetting to India view for 2nd city selection');
+      
+      // Reset to India view with a nice animation
+      mapInstanceRef.current.flyTo({
+        center: config.INDIA_CENTER,
+        zoom: config.INDIA_ZOOM,
+        pitch: 0,
+        bearing: 0,
+        speed: 1.2,
+        curve: 1.5,
+        essential: true
       });
-
-      map.addLayer({
-        id: layerConfig.id,
-        type: 'raster',
-        source: layerConfig.id,
-        paint: {
-          'raster-opacity': 0
+      
+      // Remove the main city marker temporarily for cleaner selection
+      markersRef.current.forEach(marker => {
+        if (marker._type === 'main') {
+          marker.getElement().style.opacity = '0.4';
+        }
+      });
+    } else if (!comparisonMode) {
+      // Restore marker opacity when exiting comparison mode
+      markersRef.current.forEach(marker => {
+        if (marker._type === 'main') {
+          marker.getElement().style.opacity = '1';
         }
       });
     }
+  }, [comparisonMode, comparisonCity, isMapLoaded]);
 
-    map.setLayoutProperty(layerConfig.id, 'visibility', 'visible');
-    
-    let opacity = 0;
-    const fadeIn = setInterval(() => {
-      opacity += 0.1;
-      if (map.getPaintProperty(layerConfig.id, 'raster-opacity') !== undefined) {
-        map.setPaintProperty(layerConfig.id, 'raster-opacity', Math.min(opacity, layerConfig.opacity));
+  // Update markers when comparison data changes and fit bounds to show both cities
+  useEffect(() => {
+    if (mapInstanceRef.current && isMapLoaded && comparisonData && comparisonCity && cityData) {
+      console.log('🔀 Adding comparison marker for:', comparisonCity);
+      addCityMarker([comparisonData.lng, comparisonData.lat], comparisonCity, true);
+      
+      // Restore main marker opacity
+      markersRef.current.forEach(marker => {
+        if (marker._type === 'main') {
+          marker.getElement().style.opacity = '1';
+        }
+      });
+      
+      // Fit bounds to show both cities with padding
+      const bounds = new mapboxgl.LngLatBounds();
+      bounds.extend([cityData.lng, cityData.lat]);
+      bounds.extend([comparisonData.lng, comparisonData.lat]);
+      
+      console.log('📐 Fitting bounds to show both cities');
+      mapInstanceRef.current.fitBounds(bounds, {
+        padding: { top: 80, bottom: 80, left: 80, right: 80 },
+        maxZoom: 10,
+        duration: 1500,
+        essential: true
+      });
+      
+    } else if (!comparisonCity && cityData) {
+      // Remove comparison marker when comparison is cleared
+      const compMarker = markersRef.current.find(m => m._type === 'comparison');
+      if (compMarker) {
+        compMarker.remove();
+        markersRef.current = markersRef.current.filter(m => m._type !== 'comparison');
       }
-      if (opacity >= layerConfig.opacity) clearInterval(fadeIn);
-    }, 50);
-  };
-
-  const layers = [
-    { id: 'none', icon: <X className="w-4 h-4" />, label: 'None' },
-    { id: 'temp-heat', icon: <Thermometer className="w-4 h-4" />, label: 'Temperature' },
-    { id: 'precip-radar', icon: <CloudRain className="w-4 h-4" />, label: 'Rain' },
-    { id: 'aqi-heat', icon: <Wind className="w-4 h-4" />, label: 'Air Quality' },
-  ];
-
+      
+      // Also remove the comparison info card
+      if (mapContainerRef.current) {
+        const compCard = mapContainerRef.current.querySelector('.city-card-comparison');
+        if (compCard) {
+          compCard.remove();
+          console.log('🗑️ Removed comparison info card');
+        }
+      }
+      
+      // Fly back to main city
+      if (mapInstanceRef.current) {
+        console.log('🔙 Comparison cleared - flying back to main city');
+        mapInstanceRef.current.flyTo({
+          center: [cityData.lng, cityData.lat],
+          zoom: config.CITY_ZOOM,
+          pitch: config.ANIMATION_PITCH,
+          bearing: 0,
+          speed: 1.2,
+          curve: 1.5,
+          essential: true
+        });
+      }
+    }
+  }, [comparisonData, comparisonCity, cityData, isMapLoaded]);
   return (
     <div className="w-full h-full bg-slate-900 border border-slate-800 rounded-xl overflow-hidden relative shadow-2xl">
       <div ref={mapContainerRef} className="w-full h-full" />
@@ -305,71 +359,6 @@ export const MapWidget = ({ cityData, cityName, onCitySelect, onError }) => {
           </div>
         </div>
       )}
-
-      {/* Layer Controls Dropdown - Top Right, Below Time Toggle */}
-      <div ref={dropdownRef} className="absolute right-4 top-16 z-[400]">
-        <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center gap-2 bg-slate-900/90 border border-slate-700 rounded-lg px-4 py-2.5 shadow-xl backdrop-blur-md hover:border-slate-600 transition-colors"
-        >
-          {layers.find(l => l.id === activeLayer)?.icon}
-          <span className="text-sm font-medium text-slate-200">
-            {layers.find(l => l.id === activeLayer)?.label}
-          </span>
-          <svg className={clsx("w-4 h-4 text-slate-400 transition-transform", isDropdownOpen && "rotate-180")} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-
-        {isDropdownOpen && (
-          <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900/95 border border-slate-700 rounded-lg shadow-2xl backdrop-blur-md overflow-hidden">
-            {layers.map(layer => (
-              <button
-                key={layer.id}
-                onClick={() => {
-                  setActiveLayer(layer.id);
-                  setIsDropdownOpen(false);
-                }}
-                className={clsx(
-                  "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all border-b border-slate-800 last:border-b-0",
-                  activeLayer === layer.id
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-300 hover:bg-slate-800"
-                )}
-              >
-                {layer.icon}
-                <span>{layer.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Time Mode Toggle - Top Right */}
-      <div className="absolute top-4 right-4 z-[400] flex gap-2 bg-slate-900/90 p-1 rounded-lg border border-slate-700 shadow-xl backdrop-blur-md">
-        <button
-          onClick={() => setTimeMode('current')}
-          className={clsx(
-            "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
-            timeMode === 'current'
-              ? "bg-indigo-600 text-white"
-              : "text-slate-400 hover:text-slate-200"
-          )}
-        >
-          Current
-        </button>
-        <button
-          onClick={() => setTimeMode('historical')}
-          className={clsx(
-            "px-3 py-1.5 rounded-md text-xs font-medium transition-all",
-            timeMode === 'historical'
-              ? "bg-indigo-600 text-white"
-              : "text-slate-400 hover:text-slate-200"
-          )}
-        >
-          Historical
-        </button>
-      </div>
     </div>
   );
 };
@@ -381,5 +370,12 @@ MapWidget.propTypes = {
   }),
   cityName: PropTypes.string,
   onCitySelect: PropTypes.func,
+  onCompareSelect: PropTypes.func,
   onError: PropTypes.func,
+  comparisonMode: PropTypes.bool,
+  comparisonCity: PropTypes.string,
+  comparisonData: PropTypes.shape({
+    lat: PropTypes.number,
+    lng: PropTypes.number,
+  }),
 };

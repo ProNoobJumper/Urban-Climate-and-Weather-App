@@ -10,7 +10,9 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      return this.authProvider === 'local';
+    },
     minlength: 6,
     select: false
   },
@@ -30,11 +32,30 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  favorites: [{
+    type: String, // City IDs
+    ref: 'City'
+  }],
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local'
   }
 }, { timestamps: true });
 
-// Hash password before saving
+// Hash password before saving (only for local auth)
 userSchema.pre('save', async function(next) {
+  // Skip password hashing for Google users
+  if (this.authProvider === 'google' || !this.password) {
+    return next();
+  }
+  
   if (!this.isModified('password')) return next();
   
   try {

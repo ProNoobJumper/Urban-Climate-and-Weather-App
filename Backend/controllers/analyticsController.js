@@ -351,6 +351,206 @@ const compareСities = async (req, res) => {
   }
 };
 
+/**
+ * Get historical records (extremes) for a city
+ * @route GET /api/analytics/records/:cityId
+ */
+const getHistoricalRecords = async (req, res) => {
+  try {
+    const { cityId } = req.params;
+    
+    // Check cache
+    const cacheKey = `records:${cityId}`;
+    const cached = getCachedData(cacheKey);
+    
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        data: cached,
+        cached: true
+      });
+    }
+    
+    // Find extremes
+    const [hottest, coldest, wettest, worstAqi] = await Promise.all([
+      HistoricalData.findOne({ cityId }).sort({ maxTemperature: -1 }).select('date maxTemperature cityName').lean(),
+      HistoricalData.findOne({ cityId }).sort({ minTemperature: 1 }).select('date minTemperature cityName').lean(),
+      HistoricalData.findOne({ cityId }).sort({ totalRainfall: -1 }).select('date totalRainfall cityName').lean(),
+      HistoricalData.findOne({ cityId }).sort({ avgAqi: -1 }).select('date avgAqi cityName').lean()
+    ]);
+    
+    const result = {
+      cityId,
+      hottest: hottest ? { date: hottest.date, value: hottest.maxTemperature, unit: '°C' } : null,
+      coldest: coldest ? { date: coldest.date, value: coldest.minTemperature, unit: '°C' } : null,
+      wettest: wettest ? { date: wettest.date, value: wettest.totalRainfall, unit: 'mm' } : null,
+      worstAqi: worstAqi ? { date: worstAqi.date, value: worstAqi.avgAqi, unit: 'AQI' } : null
+    };
+    
+    // Cache for 24 hours (records change slowly)
+    setCachedData(cacheKey, result, 86400);
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+    
+  } catch (error) {
+    logger.error('Get records error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Compare today with typical day (historical average)
+ * @route GET /api/analytics/typical/:cityId
+ */
+const getTypicalDayComparison = async (req, res) => {
+  try {
+    const { cityId } = req.params;
+    const date = req.query.date ? new Date(req.query.date) : new Date();
+    const month = date.getMonth() + 1; // 1-12
+    const day = date.getDate();
+    
+    // Check cache
+    const cacheKey = `typical:${cityId}:${month}:${day}`;
+    const cached = getCachedData(cacheKey);
+    
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        data: cached,
+        cached: true
+      });
+    }
+    
+    // Get historical data for this month across all years
+    // Note: Ideally we'd match day too, but data might be sparse, so month average is safer for "typical"
+    const historicalData = await HistoricalData.aggregate([
+      {
+        $match: {
+          cityId: cityId,
+          $expr: { $eq: [{ $month: "$date" }, month] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          avgTemp: { $avg: "$avgTemperature" },
+          avgMaxTemp: { $avg: "$maxTemperature" },
+          avgMinTemp: { $avg: "$minTemperature" },
+          avgAqi: { $avg: "$avgAqi" },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    const typical = historicalData[0] || {};
+    
+    // Get today's/requested date's actual data if available (from Realtime or Historical)
+    // For now, we just return the typical values, frontend compares with current
+    
+    const result = {
+      cityId,
+      month: date.toLocaleString('default', { month: 'long' }),
+      typical: {
+        avgTemperature: Math.round((typical.avgTemp || 0) * 10) / 10,
+        maxTemperature: Math.round((typical.avgMaxTemp || 0) * 10) / 10,
+        minTemperature: Math.round((typical.avgMinTemp || 0) * 10) / 10,
+        aqi: Math.round(typical.avgAqi || 0),
+        dataPoints: typical.count || 0
+      }
+    };
+    
+    // Cache for 24 hours
+    setCachedData(cacheKey, result, 86400);
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+    
+  } catch (error) {
+    logger.error('Get typical comparison error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get long-term trends (yearly averages)
+ * @route GET /api/analytics/long-term/:cityId
+ */
+const getLongTermTrends = async (req, res) => {
+  try {
+    const { cityId } = req.params;
+    
+    // Check cache
+    const cacheKey = `longterm:${cityId}`;
+    const cached = getCachedData(cacheKey);
+    
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        data: cached,
+        cached: true
+      });
+    }
+    
+    // Aggregate by year
+    const yearlyData = await HistoricalData.aggregate([
+      {
+        $match: { cityId: cityId }
+      },
+      {
+        $group: {
+          _id: { $year: "$date" },
+          avgTemp: { $avg: "$avgTemperature" },
+          maxTemp: { $max: "$maxTemperature" },
+          minTemp: { $min: "$minTemperature" },
+          avgAqi: { $avg: "$avgAqi" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    const trends = yearlyData.map(d => ({
+      year: d._id,
+      avgTemperature: Math.round(d.avgTemp * 10) / 10,
+      maxTemperature: d.maxTemp,
+      minTemperature: d.minTemp,
+      aqi: Math.round(d.avgAqi || 0),
+      dataPoints: d.count
+    }));
+    
+    const result = {
+      cityId,
+      trends
+    };
+    
+    // Cache for 24 hours
+    setCachedData(cacheKey, result, 86400);
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+    
+  } catch (error) {
+    logger.error('Get long-term trends error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 // ========== PRIVATE HELPER FUNCTIONS ==========
 
 /**
@@ -459,5 +659,8 @@ module.exports = {
   getTrends,
   getHeatmap,
   getCorrelation,
-  compareСities
+  compareСities,
+  getHistoricalRecords,
+  getTypicalDayComparison,
+  getLongTermTrends
 };

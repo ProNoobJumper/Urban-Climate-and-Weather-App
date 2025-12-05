@@ -211,6 +211,12 @@ class MasterCollector {
             // Quality metrics
             dataQualityScore: data.qualityScore ? data.qualityScore * 100 : 85,
             
+            // Quality metrics
+            dataQualityScore: data.qualityScore ? data.qualityScore * 100 : 85,
+            
+            // Alerts
+            alerts: this._generateAlerts(data),
+            
             lastUpdated: timestamp
           });
 
@@ -257,6 +263,47 @@ class MasterCollector {
       logger.error('Failed to get statistics:', error.message);
       return null;
     }
+  }
+
+  /**
+   * Generate alerts based on weather conditions
+   * @param {Object} data - Weather data
+   * @returns {Array} Array of alert objects
+   */
+  _generateAlerts(data) {
+    const alerts = [];
+    
+    // Temperature Alerts
+    if (data.temperature) {
+      if (data.temperature > 40) {
+        alerts.push({ type: 'Heatwave Warning', level: 'critical', message: `Extreme heat detected: ${data.temperature}°C` });
+      } else if (data.temperature > 35) {
+        alerts.push({ type: 'High Temperature', level: 'warning', message: `High temperature detected: ${data.temperature}°C` });
+      } else if (data.temperature < 5) {
+        alerts.push({ type: 'Cold Wave Warning', level: 'critical', message: `Extreme cold detected: ${data.temperature}°C` });
+      }
+    }
+    
+    // AQI Alerts
+    if (data.aqi) {
+      if (data.aqi > 300) {
+        alerts.push({ type: 'Hazardous Air Quality', level: 'critical', message: `Air quality is Hazardous (AQI: ${data.aqi})` });
+      } else if (data.aqi > 200) {
+        alerts.push({ type: 'Very Unhealthy Air', level: 'warning', message: `Air quality is Very Unhealthy (AQI: ${data.aqi})` });
+      }
+    }
+    
+    // Wind Alerts
+    if (data.windSpeed > 50) {
+      alerts.push({ type: 'High Wind Warning', level: 'warning', message: `High winds detected: ${data.windSpeed} km/h` });
+    }
+    
+    // Rain Alerts
+    if (data.rainfall > 50) {
+      alerts.push({ type: 'Heavy Rain Alert', level: 'warning', message: `Heavy rainfall detected: ${data.rainfall} mm` });
+    }
+    
+    return alerts;
   }
 }
 

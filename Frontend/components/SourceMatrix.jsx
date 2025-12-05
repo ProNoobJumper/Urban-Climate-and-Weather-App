@@ -228,7 +228,7 @@ DetailModal.propTypes = {
 
 // --- Main Component ---
 
-export const SourceMatrix = ({ matrix, aqiData }) => {
+export const SourceMatrix = ({ matrix, aqiData, compact = false }) => {
   const [selectedMetric, setSelectedMetric] = useState(null);
 
   // Normalize AQI data into MetricRows
@@ -273,7 +273,12 @@ export const SourceMatrix = ({ matrix, aqiData }) => {
 
   return (
     <>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className={clsx(
+        "grid gap-3",
+        compact 
+          ? "grid-cols-2" // Compact: 2 columns for comparison mode
+          : "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" // Full: responsive grid
+      )}>
         {combinedMetrics.map((row) => (
           <MetricCard 
             key={row.metricId} 
@@ -306,8 +311,10 @@ SourceMatrix.propTypes = {
     pm10: PropTypes.number.isRequired,
     no2: PropTypes.number.isRequired,
   })),
+  compact: PropTypes.bool,
 };
 
 SourceMatrix.defaultProps = {
   aqiData: [],
+  compact: false,
 };

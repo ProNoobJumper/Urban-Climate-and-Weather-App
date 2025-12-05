@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth');
 const dataRoutes = require('./routes/data');
 const researchRoutes = require('./routes/research');
 const analyticsRoutes = require('./routes/analytics');
+const insightsRoutes = require('./routes/insights');
 
 // Import jobs
 const { fetchRealTimeData, aggregateHistoricalData } = require('./jobs/fetchDataJob');
@@ -16,6 +17,9 @@ const { generateDailyPredictions } = require('./jobs/predictionJob');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
+
+// Initialize Passport
+require('./config/passport');
 
 const app = express();
 
@@ -32,6 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/insights', insightsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

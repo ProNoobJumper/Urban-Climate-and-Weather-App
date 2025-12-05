@@ -1,6 +1,6 @@
 # 🎯 Urban Climate & Weather App - Feature Tracker
 
-**Last Updated:** December 4, 2025  
+**Last Updated:** December 5, 2025  
 **Project Status:** In Active Development
 
 ---
@@ -129,6 +129,10 @@ This document tracks all features for the Urban Climate and Weather Application,
 | ------------------------ | ------ | ------------------------------------- |
 | JWT Authentication       | ✅     | Token-based auth implemented          |
 | Password Hashing         | ✅     | bcrypt encryption                     |
+| Google OAuth 2.0         | ✅     | One-click sign-in with Google         |
+| OAuth Callback Handler   | ✅     | Passport.js integration               |
+| User Profile API         | ✅     | GET/PUT /api/auth/profile             |
+| Favorites Management API | ✅     | Add/remove/get favorites endpoints    |
 | CORS Configuration       | ✅     | Cross-origin requests handled         |
 | Input Validation         | ✅     | Request validation middleware         |
 | SQL Injection Protection | ✅     | MongoDB prevents SQL injection        |
@@ -187,8 +191,9 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 | Feature                    | Status | Notes                                   |
 | -------------------------- | ------ | --------------------------------------- |
+| Landing Page               | ✅     | Professional dark theme with gradients  |
 | Geolocation Auto-Detection | ✅     | Detects user's city on load             |
-| Favorites System           | ✅     | Save favorite cities                    |
+| Favorites System           | ✅     | Save favorite cities with live weather  |
 | City Search Autocomplete   | ✅     | Smart city suggestions                  |
 | Dark Mode                  | ✅     | Default dark theme                      |
 | Light Mode                 | ❌     | Theme toggle not implemented            |
@@ -284,31 +289,40 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 ### Analytics & Insights
 
-| Feature                              | Status | Notes                                    |
-| ------------------------------------ | ------ | ---------------------------------------- |
-| Trend Analysis (Backend)             | ✅     | `/api/analytics/trends`                  |
-| Trend Visualization (Frontend)       | ✅     | Line charts                              |
-| Correlation Analysis (Backend)       | ✅     | `/api/analytics/correlation`             |
-| Correlation Visualization (Frontend) | ❌     | Scatter plots not implemented            |
-| Multi-City Comparison (Backend)      | ✅     | `/api/analytics/compare`                 |
-| Multi-City Comparison (Frontend)     | ❌     | Comparison UI not implemented            |
-| Heatmap Data (Backend)               | ✅     | `/api/analytics/heatmap`                 |
-| Heatmap Visualization (Frontend)     | ❌     | Grid heatmap not implemented             |
-| Historical Records (Backend)         | ❌     | Hottest/coldest tracking not implemented |
-| Historical Records (Frontend)        | ❌     | Record display not implemented           |
-| Anomaly Detection (Backend)          | ❌     | Spike detection not implemented          |
-| Anomaly Alerts (Frontend)            | ❌     | Alert banners not implemented            |
+| Feature                              | Status | Notes                                                                                                  |
+| ------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------ |
+| Trend Analysis (Backend)             | ✅     | `/api/analytics/trends`                                                                                |
+| Trend Visualization (Frontend)       | ✅     | Line charts                                                                                            |
+| Correlation Analysis (Backend)       | ✅     | `/api/analytics/correlation`                                                                           |
+| Correlation Visualization (Frontend) | 🚧     | Scatter plots implemented, tooltip bug                                                                 |
+| Multi-City Comparison (Backend)      | ✅     | `/api/analytics/compare`                                                                               |
+| Multi-City Comparison (Frontend)     | ✅     | ComparisonCards with side-by-side cards, diff display, table, expanded metrics (AQI, PM2.5, PM10, NO2) |
+| Heatmap Data (Backend)               | ✅     | `/api/analytics/heatmap`                                                                               |
+| Heatmap Visualization (Frontend)     | ❌     | Grid heatmap not implemented                                                                           |
+| Historical Records (Backend)         | ❌     | Hottest/coldest tracking not implemented                                                               |
+| Historical Records (Frontend)        | ❌     | Record display not implemented                                                                         |
+| Anomaly Detection (Backend)          | ❌     | Spike detection not implemented                                                                        |
+| Anomaly Alerts (Frontend)            | ❌     | Alert banners not implemented                                                                          |
 
 ### User Authentication & Profiles
 
-| Feature                | Status | Notes                                              |
-| ---------------------- | ------ | -------------------------------------------------- |
-| User Registration Flow | ✅     | Backend + frontend ready                           |
-| User Login Flow        | ✅     | JWT authentication                                 |
-| Profile Management     | ✅     | Backend endpoints exist                            |
-| Frontend Auth UI       | ❌     | Login/register forms not implemented               |
-| Role-Based Features    | 🚧     | Backend roles defined, frontend not differentiated |
-| Favorites Sync         | ❌     | Favorites stored locally, not synced to backend    |
+| Feature                   | Status | Notes                                                 |
+| ------------------------- | ------ | ----------------------------------------------------- |
+| User Registration Flow    | ✅     | Email/password with validation                        |
+| Google OAuth Registration | ✅     | One-click sign-up with Google                         |
+| User Login Flow           | ✅     | JWT authentication                                    |
+| Google OAuth Login        | ✅     | Seamless Google sign-in                               |
+| Profile Management        | ✅     | View and edit user profile                            |
+| Login Modal UI            | ✅     | Dark theme with glassmorphism                         |
+| Register Modal UI         | ✅     | Password strength indicator                           |
+| Profile Dashboard UI      | ✅     | User info and favorites with live weather             |
+| Landing Page UI           | ✅     | Professional multi-section design                     |
+| OAuth Callback Handler    | ✅     | Processes Google redirect and stores token            |
+| Role-Based Features       | 🚧     | Backend roles defined, frontend not differentiated    |
+| Favorites Sync            | ✅     | Favorites stored in MongoDB and synced across devices |
+| Password Reset            | ❌     | Forgot password flow not implemented                  |
+| Email Verification        | ❌     | Email confirmation not implemented                    |
+| Social Login (Facebook/X) | ❌     | Only Google OAuth implemented                         |
 
 ### Research Data Upload
 
@@ -372,38 +386,38 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 ### Backend
 
-- **Completed:** 35 features ✅
+- **Completed:** 40 features ✅
 - **In Progress:** 12 features 🚧
 - **Needs Improvement:** 5 features 🔄
 - **Not Started:** 28 features ❌
-- **Total:** 80 backend features
-- **Completion Rate:** ~44%
+- **Total:** 85 backend features
+- **Completion Rate:** ~47%
 
 ### Frontend
 
-- **Completed:** 28 features ✅
+- **Completed:** 36 features ✅
 - **In Progress:** 4 features 🚧
 - **Needs Improvement:** 4 features 🔄
-- **Not Started:** 34 features ❌
-- **Total:** 70 frontend features
-- **Completion Rate:** ~40%
+- **Not Started:** 31 features ❌
+- **Total:** 75 frontend features
+- **Completion Rate:** ~48%
 
 ### Full-Stack
 
-- **Completed:** 15 features ✅
+- **Completed:** 20 features ✅
 - **In Progress:** 3 features 🚧
 - **Needs Improvement:** 2 features 🔄
-- **Not Started:** 20 features ❌
-- **Total:** 40 full-stack features
-- **Completion Rate:** ~38%
+- **Not Started:** 18 features ❌
+- **Total:** 43 full-stack features
+- **Completion Rate:** ~47%
 
 ### Overall Project
 
-- **Total Features:** 190
-- **Completed:** 78 features (41%)
-- **In Progress:** 19 features (10%)
-- **Not Started:** 82 features (43%)
-- **Needs Improvement:** 11 features (6%)
+- **Total Features:** 203
+- **Completed:** 96 features (47%)
+- **In Progress:** 19 features (9%)
+- **Not Started:** 77 features (38%)
+- **Needs Improvement:** 11 features (5%)
 
 ---
 
@@ -411,8 +425,8 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 ### High Priority (Next Sprint)
 
-1. ❌ Frontend Authentication UI (Login/Register forms)
-2. ❌ Multi-City Comparison UI
+1. ✅ Frontend Authentication UI (Login/Register/Profile complete with Google OAuth)
+2. ✅ Multi-City Comparison UI (Enhanced with full metrics & source selection)
 3. ❌ Data Export System (CSV/JSON downloads)
 4. ❌ Historical Records Tracking (Hottest/Coldest days)
 5. ❌ Alert System (Extreme weather/AQI warnings)
@@ -437,13 +451,71 @@ This document tracks all features for the Urban Climate and Weather Application,
 
 ## 📝 NOTES
 
-- **Current Focus:** Core functionality is working well. Map interaction issues have been resolved.
-- **Recent Fixes:** Map double-zoom eliminated, city selection validation improved, markers display accurate data.
-- **Known Issues:** See `docs/mistakes_log.md` for detailed issue tracking.
+- **Current Focus:** Core functionality is working well. Map interaction and comparison features refined.
 - **Documentation:** Comprehensive docs in `/docs` folder including walkthroughs, troubleshooting, and API guides.
+
+---
+
+## 🔧 RECENT SESSION FIXES (December 5, 2025)
+
+### ✅ Fixed Issues
+
+| Issue                        | Component                     | Description                                                                                              |
+| ---------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| API Port Mismatch            | `config.js`                   | Fixed `API_BASE_URL` from port 5000 to 3000                                                              |
+| Comparison Mode State        | `SearchHeader.jsx`, `App.jsx` | Connected `comparisonMode` prop between parent and child components                                      |
+| Map Click in Comparison Mode | `MapWidget.jsx`               | Fixed stale closure issue - map now correctly routes clicks to `onCompareSelect` when in comparison mode |
+| Line Chart Dashing           | `TrendChart.jsx`              | Main city now uses **solid lines**, comparison city uses **dashed lines** with lower opacity (0.5)       |
+| Independent Source Toggles   | `TrendChart.jsx`              | Toggling a source in one city's sidebar only affects that city's data (not both)                         |
+| Comparison Clear - Zoom      | `MapWidget.jsx`               | Map now flies back to main city when comparison is cleared                                               |
+| Comparison Clear - Widget    | `MapWidget.jsx`               | Comparison info card is removed when comparison is cleared                                               |
+| Compare Map Flow             | `MapWidget.jsx`               | When clicking Compare, map zooms out to India view for 2nd city selection                                |
+| Fit Bounds                   | `MapWidget.jsx`               | After selecting 2nd city, map fits bounds to show both city markers                                      |
+| Comparison Metrics Expansion | `ComparisonCards.jsx`         | Added Pressure, PM2.5, PM10, NO2 to comparison view (matching single city view)                          |
+| Source Selection UI          | `ComparisonCards.jsx`         | Improved dropdown layout, fixed source name display, added visual indicators                             |
+| Wind Speed Display Fix       | `weatherService.js`           | Fixed missing Wind Speed in fallback data and standardized metric ID to `windSpeed`                      |
+| Metric Data Merging          | `ComparisonCards.jsx`         | Implemented logic to merge weather matrix with AQI breakdown data for complete comparison                |
+
+### ⛔ UNRESOLVED - Too Buggy (Recharts Library Limitation)
+
+| Bug                    | Component        | Description                                                                   | Status        |
+| ---------------------- | ---------------- | ----------------------------------------------------------------------------- | ------------- |
+| Scatter Tooltip Source | `TrendChart.jsx` | Tooltip shows incorrect source name when multiple sources/cities are selected | ⛔ CANNOT FIX |
+| Scatter Tooltip City   | `TrendChart.jsx` | City name may show incorrectly for overlapping scatter points                 | ⛔ CANNOT FIX |
+
+> **Root Cause:** The `recharts` library has fundamental issues with how it handles tooltip payloads for multiple `<Scatter>` components. When multiple scatter series exist, recharts doesn't reliably pass the correct data point to the tooltip. Multiple approaches tried (custom shapes, refs, parsing entry.name, iterating payload) all failed.
+>
+> **Recommendation:** To fix this properly, would need to:
+>
+> 1. Replace `recharts` with `visx` or raw `d3` for scatter charts
+> 2. Or implement custom mouse tracking/hit detection instead of relying on recharts tooltip
+> 3. Or disable multi-source/multi-city scatter view and only allow single-source comparison
+
+### 🔄 Needs Improvement
+
+| Feature                | Component        | Current State         | Improvement Needed                      |
+| ---------------------- | ---------------- | --------------------- | --------------------------------------- |
+| Per-City Source Memory | `TrendChart.jsx` | Resets on city change | Remember source preferences per session |
+
+### ❌ Pending Implementation
+
+| Feature                         | Description                                             | Component        |
+| ------------------------------- | ------------------------------------------------------- | ---------------- |
+| Scatter Correlation Labels      | Show correlation coefficient (r-value) on scatter chart | `TrendChart.jsx` |
+| Export Scatter Data             | Allow exporting correlation analysis data               | `TrendChart.jsx` |
+| Scatter Legend                  | Better legend for multi-city scatter points             | `TrendChart.jsx` |
+| Map City Search in Compare Mode | Add searchable input on map when in compare mode        | `MapWidget.jsx`  |
+
+---
+
+## 🎯 NEXT PRIORITY FIXES
+
+1. **Scatter Tooltip Bug** - The tooltip in correlation analysis scatter chart shows wrong source/city when multiple are selected
+2. **Overlapping Points** - When two cities have similar values, hovering shows wrong data
+3. **Source State Persistence** - Source toggles reset when switching cities
 
 ---
 
 **Document Maintained By:** Development Team  
 **Review Frequency:** Weekly  
-**Last Review:** December 4, 2025
+**Last Review:** December 5, 2025

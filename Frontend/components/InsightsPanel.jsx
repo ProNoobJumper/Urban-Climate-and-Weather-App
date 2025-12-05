@@ -6,7 +6,7 @@ import clsx from 'clsx';
 export const InsightsPanel = ({ insights }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {insights.map((insight, idx) => {
+      {insights.filter(i => i.message && i.message.trim().length > 0).map((insight, idx) => {
         let Icon = Info;
         let colorClass = "text-blue-400";
         let bgClass = "bg-blue-900/20 border-blue-800";
