@@ -5,7 +5,9 @@
 The platform allows users to explore, analyze, compare, and visualize environmental conditions using a unified interactive dashboard.
 
 ---
-
+# Demo Video Link
+https://drive.google.com/file/d/1JT6oM0fXapNNC4Zdpx41UKK3LcYSYVdL/view?usp=drive_link
+---
 ## 🚀 Features
 
 ### ✅ Core Capabilities
