@@ -739,16 +739,49 @@ const generateFallbackAlerts = (weather, aqi, cityName = '') => {
 };
 
 /**
- * Fetch historical records (extremes)
+ * Fetch 10-year historical records (via Visual Crossing API fallback)
+ * @param {string} cityName - Name of the city
+ * @returns {Promise<Object>} Historical records with source indicator
  */
-export const fetchHistoricalRecords = async (cityId) => {
+export const fetchHistoricalRecords = async (cityName) => {
   if (!config.USE_BACKEND_DATA) return null;
   try {
-    const res = await fetch(`${config.API_BASE_URL}/analytics/records/${cityId}`);
+    const res = await fetch(`${config.API_BASE_URL}/data/historical-records/${encodeURIComponent(cityName)}`);
     const data = await res.json();
-    return data.success ? data.data : null;
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to fetch historical records');
+    }
+    
+    // Transform records to expected format
+    const { records, source, dataPoints } = data;
+    
+    return {
+      hottest: records.hottest ? {
+        value: records.hottest.temperature,
+        unit: '°C',
+        date: records.hottest.date
+      } : null,
+      coldest: records.coldest ? {
+        value: records.coldest.temperature,
+        unit: '°C',
+        date: records.coldest.date
+      } : null,
+      wettest: records.wettest ? {
+        value: records.wettest.precipitation || 0,
+        unit: 'mm',
+        date: records.wettest.date
+      } : null,
+      worstAqi: records.worstAqi ? {
+        value: Math.round(records.worstAqi.aqi),
+        unit: 'AQI',
+        date: records.worstAqi.date
+      } : null,
+      source,  // 'Database' or 'Visual Crossing API'
+      dataPoints  // Number of days analyzed
+    };
   } catch (error) {
-    console.error('Error fetching records:', error);
+    console.error('Error fetching historical records:', error);
     return null;
   }
 };
@@ -780,10 +813,10 @@ const fetchAIInsights = async (cityName, cityId, currentTemp, currentAqi) => {
     let histRecords = null;
     let typicalData = null;
 
-    // Only fetch history if we have a cityId (backend data)
-    if (cityId) {
-      histRecords = await fetchHistoricalRecords(cityId);
-      typicalData = await fetchTypicalComparison(cityId);
+    // Only fetch history if we have city data
+    if (cityName) {
+      histRecords = await fetchHistoricalRecords(cityName);
+      typicalData = await fetchTypicalComparison(cityId || cityName);
     }
 
     const queryParams = new URLSearchParams({
@@ -816,13 +849,28 @@ const fetchAIInsights = async (cityName, cityId, currentTemp, currentAqi) => {
  * Fetch long-term trends
  */
 export const fetchLongTermTrends = async (cityId) => {
-  if (!config.USE_BACKEND_DATA) return null;
   try {
-    const res = await fetch(`${config.API_BASE_URL}/analytics/long-term/${cityId}`);
-    const data = await res.json();
-    return data.success ? data.data : null;
+    const response = await fetch(`${config.API_BASE_URL}/api/analytics/trends/${cityId}`);
+    if (!response.ok) throw new Error('Failed to fetch trends');
+    return await response.json();
   } catch (error) {
     console.error('Error fetching long-term trends:', error);
     return null;
+  }
+};
+
+/**
+ * Fetch historical weather data for a specific date
+ */
+export const fetchHistoricalDate = async (cityName, date) => {
+  try {
+    const response = await fetch(`${config.API_BASE_URL}/historical-date/${cityName}/${date}`);
+    if (!response.ok) throw new Error('No data available for this date');
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching historical date:', error);
+    throw error;
   }
 };

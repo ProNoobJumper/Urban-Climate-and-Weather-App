@@ -10,6 +10,8 @@ const dataRoutes = require('./routes/data');
 const researchRoutes = require('./routes/research');
 const analyticsRoutes = require('./routes/analytics');
 const insightsRoutes = require('./routes/insights');
+const cacheRoutes = require('./routes/cacheRoutes');
+const historicalDateRoutes = require('./routes/historical-date');
 
 // Import jobs
 const { fetchRealTimeData, aggregateHistoricalData } = require('./jobs/fetchDataJob');
@@ -37,6 +39,8 @@ app.use('/api/data', dataRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/insights', insightsRoutes);
+app.use('/api/cache', cacheRoutes);
+app.use('/api/historical-date', historicalDateRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

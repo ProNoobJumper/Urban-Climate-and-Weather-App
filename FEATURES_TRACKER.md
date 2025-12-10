@@ -837,3 +837,115 @@ To complete the remaining features, the following would be required:
 **Document Maintained By:** Development Team  
 **Review Frequency:** Weekly  
 **Last Review:** December 5, 2025
+
+---
+
+##  DECEMBER 10, 2025 SESSION - HISTORICAL DATA & AI INSIGHTS
+
+###  Completed Features
+
+| Feature | Component | Description |
+| ------- | --------- | ----------- |
+| AI Insights Integration | `openaiService.js`, `InsightsPanel.jsx` | Integrated OpenAI API for contextual weather insights with "ChatGPT" source badges |
+| Visual Crossing API | `visualCrossingCollector.js` | Added Visual Crossing API for 1-year historical weather data (temperature, precipitation) |
+| Historical Records Component | `HistoricalRecords.jsx` | Complete UI for displaying extreme records (hottest, coldest, wettest days) with dates |
+| Interactive Date Explorer | `HistoricalRecords.jsx`, `weatherService.js` | Date picker to explore historical weather for any past date |
+| City Model Creation | `City.js` | Created Mongoose schema for city metadata to enable database queries |
+| Historical Date Endpoint | `historical-date.js` | Backend API endpoint `/api/historical-date/:cityName/:date` for single-day queries |
+| Error State UI | `HistoricalRecords.jsx` | Descriptive error messages in record cards when API quota exceeded or data unavailable |
+| Layout Restructuring | `HistoricalRecords.jsx` | Warning message at top, removed blocking overlay, always show 4 cards + date explorer |
+
+###  Bug Fixes
+
+| Issue | Component | Fix |
+| ----- | --------- | --- |
+| Double `/api/` Prefix | `weatherService.js` | Fixed URL construction - `config.API_BASE_URL` already includes `/api` |
+| Wrong .env Variable Name | `Frontend/.env` | Changed `VITE_API_URL`  `VITE_API_BASE_URL` to match config.js |
+| City Model Missing | `City.js` | File was empty causing `City.findOne is not a function` error - created full schema |
+| PowerShell Syntax Errors | `visualCrossingCollector.js`, `HistoricalRecords.jsx` | Fixed literal `\r\n` characters inserted by PowerShell commands |
+| Early Return Logic | `HistoricalRecords.jsx` | Removed early return preventing simultaneous display of warning, cards, and date explorer |
+| AQI Record Display | `HistoricalRecords.jsx` | Added specific message "AQI data not available in Visual Crossing API" for AQI card |
+
+###  Updated Features
+
+| Feature | Status | Notes |
+| ------- | ------ | ----- |
+| Historical Records (Backend) |  | Visual Crossing API provides 1 year of daily data with extreme records |
+| Historical Records (Frontend) |  | 4 record cards + interactive date explorer + warning message |
+| AI Insights |  | Real ChatGPT responses with source attribution, no fallbacks |
+| Historical Data Archive |  | 1 year via Visual Crossing (quota limited), 10+ years requires database |
+
+###  Known Limitations
+
+#### Visual Crossing API Quota
+
+**Status:** Free tier exhausted  
+**Date Identified:** December 10, 2025
+
+**Problem:**
+- Free tier: 1000 queries/day
+- Each historical query costs ~161 credits (3.7k record cost)
+- Result: ~6 cities can be queried per day
+- Current status: 0 free credits remaining
+
+**Impact:**
+- Historical records show "API quota exceeded or data unavailable" in cards
+- Date explorer still functional (lower cost per single-day query)
+- Quota resets daily
+
+**Workarounds:**
+1. Upgrade Visual Crossing API plan for higher quota
+2. Add frequently queried cities to database for 10+ years of data
+3. Implement caching to reduce redundant API calls
+
+#### Visual Crossing AQI Limitation
+
+**Status:** Permanent API limitation  
+**Date Identified:** December 10, 2025
+
+**Problem:**
+- Visual Crossing API does not provide historical AQI data
+- Only temperature, precipitation, humidity, wind available
+
+**Solution:**
+- "Worst AQI" card displays: "AQI data not available in Visual Crossing API"
+- Card structure maintained (title + icon + error message)
+- No data loss - AQI from other sources (Google AQI, UrbanEmission) still available for current data
+
+###  Configuration Changes
+
+#### Backend `.env` Additions
+
+```env
+# Visual Crossing API (Historical Weather Data)
+VISUAL_CROSSING_API_KEY=your_key_here
+
+# OpenAI API (AI Insights)
+OPENAI_API_KEY=your_key_here
+```
+
+#### Frontend `.env` Fix
+
+```env
+# BEFORE (incorrect)
+VITE_API_URL=http://localhost:3000/api
+
+# AFTER (correct)
+VITE_API_BASE_URL=http://localhost:3000/api
+```
+
+###  Feature Status Updates
+
+**Historical Records Tracking:**
+- Backend:    (Visual Crossing integration complete)
+- Frontend:    (HistoricalRecords component complete)
+
+**AI Insights:**
+- Backend:  (OpenAI service functional)
+- Frontend:  (InsightsPanel displays ChatGPT responses)
+
+---
+
+**Document Maintained By:** Development Team  
+**Review Frequency:** Weekly  
+**Last Review:** December 10, 2025

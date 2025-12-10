@@ -72,9 +72,12 @@ class WeatherUnionCollector {
       if (error.response?.status === 401) {
         logger.error(`${this.name}: Invalid API key`);
       } else if (error.response?.status === 404) {
-        logger.debug(`${this.name}: No data for ${cityName}`);
+        logger.debug(`${this.name}: No data for ${cityName}`)  ;
+      } else if (error.response?.status === 400) {
+        // 400 errors are expected when locality IDs are unavailable
+        logger.debug(`${this.name}: Locality not available for ${cityName}`);
       } else {
-        logger.error(`${this.name} Weather Error for ${cityName}:`, error.message);
+        logger.debug(`${this.name}: Could not fetch data for ${cityName} - ${error.message}`);
       }
       return null;
     }

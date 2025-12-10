@@ -283,7 +283,8 @@ export default function App() {
 
             {/* Historical Records Section */}
             <HistoricalRecords 
-              cityId={data.cityId} 
+              cityId={data.cityId}
+              cityName={data.location}  
               isFallback={!data.cityId}
               history={data.history}
               currentData={{

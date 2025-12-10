@@ -10,14 +10,13 @@ const cityInsightsSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  month: {
-    type: Number, // 1-12
+  date: {
+    type: String, // YYYY-MM-DD format for daily caching
     required: true,
-    min: 1,
-    max: 12
+    index: true
   },
   insights: [{
-    insightType: {
+    type: {
       type: String,
       enum: ['trend', 'alert', 'record'],
       required: true
@@ -37,7 +36,7 @@ const cityInsightsSchema = new mongoose.Schema({
     },
     source: {
       type: String,
-      default: 'Database'
+      default: 'OpenAI'
     }
   }],
   createdAt: {
@@ -50,7 +49,7 @@ const cityInsightsSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Compound index for efficient lookups
-cityInsightsSchema.index({ cityId: 1, month: 1 }, { unique: true });
+// Compound index for efficient daily lookups
+cityInsightsSchema.index({ cityName: 1, date: 1 }, { unique: true });
 
 module.exports = mongoose.model('CityInsights', cityInsightsSchema);

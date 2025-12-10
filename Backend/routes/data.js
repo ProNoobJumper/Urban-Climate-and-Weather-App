@@ -4,6 +4,7 @@ const HistoricalData = require('../models/HistoricalData');
 const PredictedData = require('../models/PredictedData');
 const { CITIES } = require('../config/constants');
 const auth = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -192,5 +193,115 @@ router.get('/nearby', (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// GET HISTORICAL RECORDS (10-year climate data with API fallback)
+router.get('/historical-records/:cityName', async (req, res) => {
+  try {
+    const { cityName } = req.params;
+    const visualCrossing = require('../dataCollectors/visualCrossingCollector');
+    
+    // Try database first
+    const dbRecords = await HistoricalData.find({ 
+      cityName: new RegExp(cityName, 'i')
+    })
+    .sort({ date: -1 })
+    .limit(3650); // 10 years of daily data
+    
+    // If we have good database coverage (at least 1 year), use it
+    if (dbRecords.length >= 365) {
+      logger.info(`Using database records for ${cityName} (${dbRecords.length} days)`);
+      
+      // Calculate records from DB data
+      const records = calculateRecordsFromDB(dbRecords);
+      
+      return res.status(200).json({
+        success: true,
+        source: 'Database',
+        records,
+        dataPoints: dbRecords.length
+      });
+    }
+    
+    // Otherwise, fallback to Visual Crossing API
+    logger.info(`Insufficient DB data for ${cityName}, using Visual Crossing API`);
+    
+    const apiData = await visualCrossing.fetchHistoricalData(cityName);
+    
+    if (!apiData) {
+      return res.status(404).json({
+        success: false,
+        message: 'No historical data available for this city'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      source: 'Visual Crossing API',
+      records: apiData.records,
+      dataPoints: apiData.dataPoints
+    });
+    
+  } catch (error) {
+    logger.error('Historical records error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Helper function to calculate records from database data
+function calculateRecordsFromDB(dbRecords) {
+  let hottestDay = null;
+  let coldestDay = null;
+  let wettestDay = null;
+  let worstAqiDay = null;
+  let maxTemp = -Infinity;
+  let minTemp = Infinity;
+  let maxPrecip = 0;
+  let maxAqi = 0;
+
+  dbRecords.forEach(record => {
+    // Hottest
+    if (record.temperature > maxTemp) {
+      maxTemp = record.temperature;
+      hottestDay = {
+        temperature: record.temperature,
+        date: record.date
+      };
+    }
+
+    // Coldest
+    if (record.temperature < minTemp) {
+      minTemp = record.temperature;
+      coldestDay = {
+        temperature: record.temperature,
+        date: record.date
+      };
+    }
+
+    // Wettest
+    if (record.precipitation && record.precipitation > maxPrecip) {
+      maxPrecip = record.precipitation;
+      wettestDay = {
+        precipitation: record.precipitation,
+        date: record.date
+      };
+    }
+
+    // Worst AQI
+    if (record.aqi && record.aqi > maxAqi) {
+      maxAqi = record.aqi;
+      worstAqiDay = {
+        aqi: record.aqi,
+        date: record.date
+      };
+    }
+  });
+
+  return {
+    hottest: hottestDay,
+    coldest: coldestDay,
+    wettest: wettestDay,
+    worstAqi: worstAqiDay
+  };
+}
 
 module.exports = router;
