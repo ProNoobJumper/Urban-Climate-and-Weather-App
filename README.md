@@ -6,6 +6,12 @@ The platform allows users to explore, analyze, compare, and visualize environmen
 
 ---
 
+# Demo Video Link
+
+https://drive.google.com/file/d/1JT6oM0fXapNNC4Zdpx41UKK3LcYSYVdL/view?usp=drive_link
+
+---
+
 ## 🚀 Features
 
 ### ✅ Core Capabilities
@@ -159,7 +165,7 @@ npm install
 Create `.env`:
 
 ```env
-VITE_API_BASE_URL=http://localhost:3000/api
+VITE_API_URL=http://localhost:3000/api
 VITE_MAPBOX_TOKEN=your_mapbox_key
 VITE_TOMORROW_API_KEY=your_key_here
 VITE_ENABLE_BACKEND=true
