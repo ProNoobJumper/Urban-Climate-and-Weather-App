@@ -12,10 +12,6 @@ https://drive.google.com/file/d/1JT6oM0fXapNNC4Zdpx41UKK3LcYSYVdL/view?usp=drive
 
 ---
 
-# Demo Video Link
-
-## https://drive.google.com/file/d/1JT6oM0fXapNNC4Zdpx41UKK3LcYSYVdL/view?usp=drive_link
-
 ## 🚀 Features
 
 ### ✅ Core Capabilities
